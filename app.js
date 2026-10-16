@@ -14,6 +14,7 @@ const renderer = createSpatialRenderer(canvas);
 const universe = buildUniverse();
 const nodeById = new Map(universe.nodes.map((node) => [node.id, node]));
 const graphInstance = spatialGraph?.SpatialGraph ? new spatialGraph.SpatialGraph(universe.nodes) : null;
+const semanticCache = new Map();
 
 let activeId = "khora";
 let selectedId = null;
@@ -134,18 +135,41 @@ function semanticLevel(item) {
   return Math.max(0, 4 - item.depth) + lodBias;
 }
 
+function semanticPayload(item) {
+  const cacheKey = `${item.id}:${item.description || item.title || ""}`;
+  if (semanticCache.has(cacheKey)) return semanticCache.get(cacheKey);
+  const summarize = semanticLod?.summarizeSemantic || semanticLod?.summarizeContent || semanticLod?.semanticSummary;
+  if (typeof summarize === "function") {
+    try {
+      const result = summarize({ id: item.id, kind: item.contentKind || "prose", content: item.description || item.title || "" }, { maxLength: 120 });
+      semanticCache.set(cacheKey, result);
+      return result;
+    } catch {
+      // The visual shell remains usable if a host swaps in an incompatible adapter.
+    }
+  }
+  const fallback = { summary: item.description || item.title || "", keywords: [item.title || item.id] };
+  semanticCache.set(cacheKey, fallback);
+  return fallback;
+}
+
 function visibleNodes() {
   const active = nodeById.get(activeId);
   if (!active) return [];
   const children = childrenOf(active.id);
-  return [active, ...children].map((item) => ({
-    ...item,
-    childCount: childrenOf(item.id).length,
-    keyword: item.keyword || item.subtitle || item.title,
-    bullets: item.bullets || [item.description, `Depth ${item.depth} spatial signal`, `${childrenOf(item.id).length} nested signals`],
-    footprint: item.footprint || (item.depth === 0 ? 420 : item.depth === 1 ? 270 : item.depth === 2 ? 210 : 150),
-    semanticLevel: semanticLevel(item),
-  }));
+  return [active, ...children].map((item) => {
+    const summary = semanticPayload(item);
+    const childCount = childrenOf(item.id).length;
+    return {
+      ...item,
+      semanticSummary: summary,
+      childCount,
+      keyword: item.keyword || summary.keywords?.[0] || item.subtitle || item.title,
+      bullets: item.bullets || [summary.summary || item.description, `Depth ${item.depth} spatial signal`, `${childCount} nested signals`],
+      footprint: item.footprint || (item.depth === 0 ? 420 : item.depth === 1 ? 270 : item.depth === 2 ? 210 : 150),
+      semanticLevel: semanticLevel(item),
+    };
+  });
 }
 
 function visibleLinks(nodes) {

@@ -23,6 +23,23 @@ function colorFor(node) {
   return PALETTE[node.kind] || PALETTE.artifact;
 }
 
+function roundedRectPath(ctx, x, y, width, height, radius) {
+  if (typeof ctx.roundRect === "function") {
+    ctx.roundRect(x, y, width, height, radius);
+    return;
+  }
+  const r = Math.min(radius, Math.abs(width) / 2, Math.abs(height) / 2);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
 /**
  * Small canvas renderer for the spatial shell. The scene format is deliberately
  * plain: { nodes: [{ id, x, y, radius, kind, title }], links: [{ from, to }] }.
@@ -307,7 +324,7 @@ export class SpatialRenderer {
     ctx.strokeStyle = `${color.edge}88`;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(-width / 2, -height / 2, width, height, 13);
+    roundedRectPath(ctx, -width / 2, -height / 2, width, height, 13);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = color.edge;
@@ -330,7 +347,7 @@ export class SpatialRenderer {
     ctx.strokeStyle = `${color.edge}${full ? "aa" : "72"}`;
     ctx.lineWidth = full ? 1.2 : 1;
     ctx.beginPath();
-    ctx.roundRect(-width / 2, -height / 2, width, height, 10);
+    roundedRectPath(ctx, -width / 2, -height / 2, width, height, 10);
     ctx.fill();
     ctx.stroke();
     ctx.shadowBlur = 0;
