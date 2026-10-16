@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07090f" />
+    <meta name="description" content="KhoraZ — a spatial knowledge workspace for navigating ideas as a universe." />
+    <title>KhoraZ · Spatial workspace</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="app">
+      <header class="topbar">
+        <div class="brand-lockup" aria-label="KhoraZ home">
+          <div class="brand-mark" aria-hidden="true"><span></span><i></i><b></b></div>
+          <div>
+            <div class="brand-name">KhoraZ</div>
+            <div class="brand-tag">Spatial workspace <span class="live-dot"></span></div>
+          </div>
+        </div>
+
+        <nav class="breadcrumb" aria-label="Current location">
+          <button class="crumb-home icon-button" id="homeButton" type="button" title="Go to universe · 0">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3.2 9.1 6.8-5.4 6.8 5.4v6.4a1.3 1.3 0 0 1-1.3 1.3H4.5a1.3 1.3 0 0 1-1.3-1.3V9.1Z"/><path d="M7.6 16.8v-4.4h4.8v4.4"/></svg>
+          </button>
+          <div class="crumb-separator">/</div>
+          <div class="crumb-trail" id="breadcrumb" aria-live="polite"></div>
+        </nav>
+
+        <div class="top-actions">
+          <div class="scale-hud" title="Current spatial scale">
+            <span class="hud-label">SCALE</span>
+            <strong id="scaleReadout">100%</strong>
+          </div>
+          <div class="zoom-controls" aria-label="Zoom controls">
+            <button class="icon-button compact" id="zoomOut" type="button" title="Zoom out · -">−</button>
+            <button class="icon-button compact" id="zoomIn" type="button" title="Zoom in · +">+</button>
+          </div>
+          <button class="command-trigger" id="commandButton" type="button" title="Open command palette · ⌘K">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8.1 4.3-3.8 5.6 3.8 5.8M11.9 4.3l3.8 5.6-3.8 5.8M11 3.2 9 16.8"/></svg>
+            <span>Command</span><kbd>⌘K</kbd>
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace" id="workspace">
+        <canvas id="spaceCanvas" aria-label="KhoraZ spatial canvas"></canvas>
+        <div class="canvas-vignette" aria-hidden="true"></div>
+        <div class="crosshair" aria-hidden="true"><span></span></div>
+        <div class="warp-flash" id="warpFlash" aria-hidden="true"></div>
+
+        <section class="floating-panel inspector-panel" aria-label="Node inspector">
+          <div class="panel-kicker"><span class="kicker-mark"></span> INSPECTOR <span class="panel-index">01</span></div>
+          <div class="inspector-content" id="inspectorContent">
+            <div class="empty-inspector">
+              <div class="empty-orbit"><span></span></div>
+              <strong>Select a node</strong>
+              <p>Click a constellation to inspect its signal.</p>
+            </div>
+          </div>
+          <div class="inspector-footer"><span class="status-light"></span><span id="selectionStatus">No selection</span><span class="footer-key">E to edit</span></div>
+        </section>
+
+        <section class="floating-panel minimap-panel" aria-label="Universe minimap">
+          <div class="minimap-heading"><div><span class="panel-kicker"><span class="kicker-mark violet"></span> UNIVERSE MAP</span></div><span class="map-depth" id="mapDepth">L0</span></div>
+          <canvas id="minimap" width="240" height="150" aria-label="Minimap of the KhoraZ universe"></canvas>
+          <div class="minimap-legend"><span><i class="legend-dot cyan"></i> explored</span><span><i class="legend-dot violet"></i> portal</span></div>
+        </section>
+
+        <section class="lod-dock floating-panel" aria-label="Level of detail control">
+          <div class="lod-copy"><span class="panel-kicker"><span class="kicker-mark amber"></span> LOD BIAS</span><strong id="lodValue">0.0</strong></div>
+          <input id="lodBias" type="range" min="-2" max="2" step="0.1" value="0" aria-label="Level of detail bias" />
+          <div class="lod-scale"><span>quiet</span><span>semantic</span><span>dense</span></div>
+        </section>
+
+        <div class="editor-overlay" id="editorOverlay" hidden>
+          <div class="editor-pointer"></div>
+          <div class="editor-heading"><span class="editor-pulse"></span><span>EDIT NODE</span><button class="close-button" id="closeEditor" type="button" aria-label="Close editor">×</button></div>
+          <label for="editorTitle">Title</label>
+          <input id="editorTitle" type="text" maxlength="80" autocomplete="off" />
+          <label for="editorNotes">Signal note</label>
+          <textarea id="editorNotes" rows="3" maxlength="220"></textarea>
+          <div class="editor-actions"><button class="ghost-button" id="cancelEditor" type="button">Cancel</button><button class="primary-button" id="saveEditor" type="button">Commit signal <span>↵</span></button></div>
+        </div>
+
+        <footer class="canvas-footer">
+          <div class="hint-group"><span class="hint-key">DRAG</span><span>pan</span><span class="hint-key">SCROLL</span><span>zoom</span><span class="hint-key">DOUBLE CLICK</span><span>dive</span></div>
+          <div class="connection-state"><span class="status-light"></span><span>Local graph</span><span class="state-separator">·</span><span id="nodeCount">0 nodes in view</span></div>
+        </footer>
+      </main>
+    </div>
+
+    <div class="palette-backdrop" id="paletteBackdrop" hidden></div>
+    <section class="command-palette" id="commandPalette" role="dialog" aria-modal="true" aria-labelledby="paletteTitle" hidden>
+      <div class="palette-topline"><span class="palette-icon">⌘</span><div><div class="palette-title" id="paletteTitle">Command palette</div><div class="palette-subtitle">Navigate the KhoraZ universe</div></div><button class="close-button" id="closePalette" type="button" aria-label="Close command palette">×</button></div>
+      <div class="palette-search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.4"/><path d="m12.8 12.8 4 4"/></svg><input id="paletteInput" type="search" placeholder="Search commands…" autocomplete="off" /></div>
+      <div class="command-list" id="commandList"></div>
+      <div class="palette-footer"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> execute</span><span><kbd>esc</kbd> close</span></div>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-glyph">✦</span><span id="toastText"></span></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

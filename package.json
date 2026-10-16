@@ -1,0 +1,15 @@
+{
+  "name": "khoraz-infinite-spatial-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KhoraZ — a zero-dependency non-Euclidean infinite-zoom spatial workspace.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test",
+    "check": "node --check app.js && node --check renderer.js && node --check spatial-graph.js && node --check semantic-lod.js && node --check server.mjs"
+  }
+}
