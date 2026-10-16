@@ -30,6 +30,20 @@ with a visible portal loop called **The Liminal Gate**.
   brief, including the rebasing equations and the browser download snippet.
 - `test/spatial-graph.test.js` — offline math, traversal, and summarizer tests.
 
+## Screenshots
+
+These committed screenshots document the main interaction surfaces at a
+1440×900 viewport:
+
+![KhoraZ spatial overview](screenshots/khoraz-overview.png)
+
+![KhoraZ command palette](screenshots/khoraz-command-palette.png)
+
+![KhoraZ editor overlay](screenshots/khoraz-editor-overlay.png)
+
+The images are generated from the local static server with a headless browser,
+so they do not depend on a hosted service or private user data.
+
 ## Requirements
 
 - Node.js `22.14.0` or newer. The expected version is pinned in `.nvmrc`.
