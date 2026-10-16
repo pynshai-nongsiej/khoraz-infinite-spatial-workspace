@@ -138,7 +138,14 @@ function visibleNodes() {
   const active = nodeById.get(activeId);
   if (!active) return [];
   const children = childrenOf(active.id);
-  return [active, ...children].map((item) => ({ ...item, semanticLevel: semanticLevel(item) }));
+  return [active, ...children].map((item) => ({
+    ...item,
+    childCount: childrenOf(item.id).length,
+    keyword: item.keyword || item.subtitle || item.title,
+    bullets: item.bullets || [item.description, `Depth ${item.depth} spatial signal`, `${childrenOf(item.id).length} nested signals`],
+    footprint: item.footprint || (item.depth === 0 ? 420 : item.depth === 1 ? 270 : item.depth === 2 ? 210 : 150),
+    semanticLevel: semanticLevel(item),
+  }));
 }
 
 function visibleLinks(nodes) {
@@ -200,7 +207,11 @@ function updateHUD(nodes) {
   $("#scaleReadout").textContent = `${Math.round(renderer.view.zoom * 100)}%`;
   $("#lodValue").textContent = `${lodBias >= 0 ? "+" : ""}${lodBias.toFixed(1)}`;
   $("#mapDepth").textContent = `L${nodeById.get(activeId)?.depth || 0}`;
-  $("#nodeCount").textContent = `${nodes.length} ${nodes.length === 1 ? "node" : "nodes"} in view`;
+  const stats = renderer.getStats?.() || { rendered: nodes.length, culled: 0 };
+  $("#nodeCount").textContent = `${stats.rendered} rendered · ${stats.culled} culled`;
+  const relativeScale = `1 : ${Math.max(1, Math.round(1 / Math.max(renderer.view.zoom, 0.01)))}x`;
+  const depthReadout = $("#depthReadout");
+  if (depthReadout) depthReadout.textContent = `DEPTH L${nodeById.get(activeId)?.depth || 0} · RELATIVE SCALE ${relativeScale}`;
 }
 
 function renderMinimap() {
@@ -360,7 +371,18 @@ function closePalette() {
 
 function filterCommands(query) {
   const normalized = query.trim().toLowerCase();
-  filteredCommands = commands.filter((command) => `${command.label} ${command.hint}`.toLowerCase().includes(normalized));
+  const nodeCommands = universe.nodes
+    .filter((item) => `${item.title} ${item.subtitle || ""} ${item.description || ""}`.toLowerCase().includes(normalized))
+    .slice(0, 8)
+    .map((item) => ({
+      label: `Dive: ${item.title}`,
+      hint: item.subtitle || `level ${item.depth}`,
+      glyph: item.kind === "portal" ? "∞" : "◈",
+      shortcut: "↵",
+      searchText: `${item.title} ${item.subtitle || ""} ${item.description || ""}`,
+      run: () => diveInto(item),
+    }));
+  filteredCommands = [...commands, ...nodeCommands].filter((command) => `${command.label} ${command.hint} ${command.searchText || ""}`.toLowerCase().includes(normalized));
   paletteIndex = Math.min(paletteIndex, Math.max(0, filteredCommands.length - 1));
   const list = $("#commandList");
   list.replaceChildren();

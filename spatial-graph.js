@@ -137,9 +137,13 @@ export function createCameraFrame(options = {}) {
     y: options.y,
   });
   const camZoom = clampCamZoom(options.camZoom ?? options.zoom);
+  const referenceNodeId = idOf(options.referenceNodeId ?? options.referenceNode);
   return {
     origin,
     camZoom,
+    referenceNodeId,
+    camX: finite(options.camX, origin.x),
+    camY: finite(options.camY, origin.y),
     viewport,
   };
 }
@@ -230,6 +234,8 @@ export function rebaseZoom(camera, nextZoom, anchor, options = {}) {
     y: worldAnchor.y - (screenAnchor.y - viewportCenter.y) / camZoom,
   };
   const result = { ...frame, origin, camZoom };
+  result.camX = origin.x;
+  result.camY = origin.y;
   if (options.mutate && camera && typeof camera === 'object') {
     camera.origin = clonePoint(origin);
     camera.camZoom = camZoom;
@@ -258,6 +264,51 @@ export function zoomOut(camera, factor = 1.2, anchor, options = {}) {
 /** Set an absolute zoom while retaining the screen point under the anchor. */
 export const setCameraZoom = rebaseZoom;
 export const zoomAt = zoomCamera;
+
+/**
+ * Move the camera into a child local frame without allowing its effective zoom
+ * to grow unbounded. This is the explicit portal-crossing operation described
+ * by the KhoraZ model; the flat renderer can use the screen-anchored helper
+ * above while hierarchical renderers can retain the reference ID and offsets.
+ */
+export function rebaseIntoChildFrame(camera, child, options = {}) {
+  const frame = createCameraFrame(camera);
+  const localX = finite(child?.localX ?? child?.x);
+  const localY = finite(child?.localY ?? child?.y);
+  const localScale = Math.max(EPSILON, finite(child?.localScale ?? child?.width, 1));
+  const camX = (frame.camX - localX) / localScale;
+  const camY = (frame.camY - localY) / localScale;
+  const result = {
+    ...frame,
+    referenceNodeId: idOf(child?.id),
+    camX,
+    camY,
+    origin: { x: camX, y: camY },
+    camZoom: clampCamZoom(frame.camZoom * localScale),
+  };
+  if (options.mutate && camera && typeof camera === 'object') Object.assign(camera, result);
+  return result;
+}
+
+/** Rebase from a child frame to its parent using the forward local transform. */
+export function rebaseToParentFrame(camera, referenceNode, parentNode, options = {}) {
+  const frame = createCameraFrame(camera);
+  const localX = finite(referenceNode?.localX ?? referenceNode?.x);
+  const localY = finite(referenceNode?.localY ?? referenceNode?.y);
+  const localScale = Math.max(EPSILON, finite(referenceNode?.localScale ?? referenceNode?.width, 1));
+  const camX = localX + frame.camX * localScale;
+  const camY = localY + frame.camY * localScale;
+  const result = {
+    ...frame,
+    referenceNodeId: idOf(parentNode?.id ?? referenceNode?.parentId),
+    camX,
+    camY,
+    origin: { x: camX, y: camY },
+    camZoom: clampCamZoom(frame.camZoom / localScale),
+  };
+  if (options.mutate && camera && typeof camera === 'object') Object.assign(camera, result);
+  return result;
+}
 
 /** A small, renderer-friendly rectangle intersection helper. */
 export function rectIntersects(a, b, margin = 0) {
@@ -300,6 +351,11 @@ export function normalizeNode(node, fallbackId = 'node') {
     y: rect.y,
     width: rect.width,
     height: rect.height,
+    localX: finite(source.localX, rect.x),
+    localY: finite(source.localY, rect.y),
+    localScale: Math.max(EPSILON, finite(source.localScale, rect.width || 1)),
+    localWidth: rect.width,
+    localHeight: rect.height,
     children,
     wormholes: wormholeList
       .map((entry) => (typeof entry === 'object' ? idOf(entry.targetId ?? entry.target ?? entry.id) : idOf(entry)))

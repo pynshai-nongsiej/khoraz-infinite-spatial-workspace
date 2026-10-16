@@ -38,6 +38,7 @@ export class SpatialRenderer {
     this.height = 1;
     this.dpr = 1;
     this.lastFrame = 0;
+    this.stats = { rendered: 0, culled: 0, tierCounts: { 0: 0, 1: 0, 2: 0, 3: 0 } };
     this.resize();
   }
 
@@ -119,7 +120,8 @@ export class SpatialRenderer {
     let nearest = Infinity;
     for (const node of this.scene.nodes) {
       const point = this.worldToScreen(node.x, node.y);
-      const radius = this.nodeRadius(node) + 10;
+      const tier = this.semanticTier(node);
+      const radius = tier.index >= 2 ? Math.max(24, tier.width * 0.34) : tier.index === 1 ? 20 : this.nodeRadius(node) + 10;
       const distance = Math.hypot(point.x - screenX, point.y - screenY);
       if (distance <= radius && distance < nearest) {
         hit = node;
@@ -132,6 +134,26 @@ export class SpatialRenderer {
   nodeRadius(node) {
     const base = node.radius || (node.depth === 0 ? 18 : node.depth === 1 ? 13 : node.depth === 2 ? 10 : 7);
     return clamp(base * Math.pow(this.view.zoom, 0.25), 3.2, 22);
+  }
+
+  /**
+   * Estimate the node's projected semantic footprint. The demo deliberately
+   * uses a generous footprint around each signal so cards have room to appear
+   * before the user reaches the physical Canvas2D pixel limit.
+   */
+  semanticFootprint(node) {
+    const base = node.footprint || (node.depth === 0 ? 420 : node.depth === 1 ? 270 : node.depth === 2 ? 210 : node.depth === 3 ? 150 : 105);
+    return Math.max(2, base * this.view.zoom);
+  }
+
+  semanticTier(node) {
+    const width = this.semanticFootprint(node);
+    const bias = Number(node.lodBias ?? this.scene.lodBias ?? 0);
+    const adjusted = width * Math.pow(2, bias / 2);
+    if (adjusted < 45) return { index: 0, width: adjusted, label: "MICRO" };
+    if (adjusted < 180) return { index: 1, width: adjusted, label: "TAG" };
+    if (adjusted < 520) return { index: 2, width: adjusted, label: "SUMMARY" };
+    return { index: 3, width: adjusted, label: "FULL" };
   }
 
   animateTo(target, duration = 420, onFrame = () => {}) {
@@ -249,11 +271,111 @@ export class SpatialRenderer {
     ctx.restore();
   }
 
+  drawMicroGlyph(ctx, node, point, radius, color, tier) {
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    ctx.globalAlpha = 0.82;
+    ctx.shadowColor = color.glow;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = color.fill;
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(2.5, radius * 0.45), 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = color.edge;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    if (node.kind === "portal") this.drawPortal(ctx, 0, 0, Math.max(3, radius * 0.8), color);
+    ctx.restore();
+    return tier;
+  }
+
+  drawKeywordPill(ctx, node, point, color) {
+    const label = String(node.keyword || node.subtitle || node.title || node.id)
+      .replace(/[^a-z0-9#-]+/gi, " ")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .join(" ")
+      .toUpperCase();
+    const text = `${node.kind === "portal" ? "∞" : "◆"} ${label || "SIGNAL"}`;
+    ctx.save();
+    ctx.font = "600 10px Inter, system-ui, sans-serif";
+    const width = Math.min(178, Math.max(76, ctx.measureText(text).width + 24));
+    const height = 26;
+    ctx.translate(point.x, point.y);
+    ctx.fillStyle = `${color.fill}22`;
+    ctx.strokeStyle = `${color.edge}88`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(-width / 2, -height / 2, width, height, 13);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = color.edge;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 0, 0.5);
+    ctx.restore();
+  }
+
+  drawSummaryCard(ctx, node, point, color, full = false) {
+    const width = full ? Math.min(360, this.semanticFootprint(node) * 0.72) : Math.min(260, this.semanticFootprint(node) * 0.66);
+    const height = full ? 132 : 92;
+    const title = node.title || node.name || node.id;
+    const bullets = node.bullets || [node.description || "A signal waiting for context.", node.subtitle || "Parent-relative spatial node.", `${node.childCount || 0} nested signals`];
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    ctx.shadowColor = color.glow;
+    ctx.shadowBlur = full ? 22 : 14;
+    ctx.fillStyle = full ? "rgba(13,22,35,.94)" : "rgba(13,20,32,.88)";
+    ctx.strokeStyle = `${color.edge}${full ? "aa" : "72"}`;
+    ctx.lineWidth = full ? 1.2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(-width / 2, -height / 2, width, height, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = color.fill;
+    ctx.fillRect(-width / 2, -height / 2, 4, height);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#eef6ff";
+    ctx.font = "650 12px Inter, system-ui, sans-serif";
+    ctx.fillText(title, -width / 2 + 15, -height / 2 + 13, width - 30);
+    ctx.fillStyle = color.edge;
+    ctx.font = "600 8px Inter, system-ui, sans-serif";
+    ctx.letterSpacing = "1px";
+    ctx.fillText(full ? "FULL PORTAL" : "EXECUTIVE SIGNAL", -width / 2 + 15, -height / 2 + 32);
+    ctx.letterSpacing = "0px";
+    ctx.fillStyle = "#99a9c4";
+    ctx.font = `${full ? 10 : 9}px Inter, system-ui, sans-serif`;
+    bullets.slice(0, full ? 4 : 3).forEach((bullet, index) => {
+      const clean = String(bullet).replace(/\s+/g, " ").trim();
+      ctx.fillStyle = color.fill;
+      ctx.fillText("•", -width / 2 + 15, -height / 2 + 48 + index * 16);
+      ctx.fillStyle = "#aab7ca";
+      ctx.fillText(clean.slice(0, full ? 58 : 45), -width / 2 + 27, -height / 2 + 48 + index * 16);
+    });
+    ctx.restore();
+  }
+
   drawNode(ctx, node) {
     const point = this.worldToScreen(node.x, node.y);
     const radius = this.nodeRadius(node);
     if (point.x < -radius * 4 || point.x > this.width + radius * 4 || point.y < -radius * 4 || point.y > this.height + radius * 4) return;
     const color = colorFor(node);
+    const tier = this.semanticTier(node);
+    this.stats.rendered += 1;
+    this.stats.tierCounts[tier.index] += 1;
+    if (tier.index === 0) return this.drawMicroGlyph(ctx, node, point, radius, color, tier);
+    if (tier.index === 1) {
+      this.drawKeywordPill(ctx, node, point, color);
+      return;
+    }
+    if (tier.index === 2 || tier.index === 3) {
+      this.drawSummaryCard(ctx, node, point, color, tier.index === 3);
+      if (node.kind === "portal") this.drawPortal(ctx, point.x, point.y, 18, color);
+      return;
+    }
     const selected = node.id === this.scene.selectedId;
     const active = node.id === this.scene.activeId;
     ctx.save();
@@ -323,6 +445,7 @@ export class SpatialRenderer {
 
   render(time = performance.now()) {
     this.lastFrame = time;
+    this.stats = { rendered: 0, culled: 0, tierCounts: { 0: 0, 1: 0, 2: 0, 3: 0 } };
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.width, this.height);
@@ -335,12 +458,25 @@ export class SpatialRenderer {
     this.drawGrid(ctx);
     const lookup = new Map(this.scene.nodes.map((node) => [node.id, node]));
     for (const link of this.scene.links) this.drawLink(ctx, link, lookup);
-    [...this.scene.nodes].sort((a, b) => (a.depth || 0) - (b.depth || 0)).forEach((node) => this.drawNode(ctx, node));
+    [...this.scene.nodes].sort((a, b) => (a.depth || 0) - (b.depth || 0)).forEach((node) => {
+      const point = this.worldToScreen(node.x, node.y);
+      const tier = this.semanticTier(node);
+      const halfExtent = tier.index >= 2 ? tier.width * 0.5 : this.nodeRadius(node) * 5;
+      if (point.x < -halfExtent || point.x > this.width + halfExtent || point.y < -halfExtent || point.y > this.height + halfExtent) {
+        this.stats.culled += 1;
+        return;
+      }
+      this.drawNode(ctx, node);
+    });
     if (this.scene.animate) requestAnimationFrame((nextTime) => this.render(nextTime));
   }
 
   getView() {
     return { ...this.view, width: this.width, height: this.height };
+  }
+
+  getStats() {
+    return { ...this.stats, tierCounts: { ...this.stats.tierCounts } };
   }
 }
 

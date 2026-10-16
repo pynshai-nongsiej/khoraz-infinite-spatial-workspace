@@ -4,6 +4,8 @@ import {
   SpatialGraph,
   createCameraFrame,
   projectPoint,
+  rebaseIntoChildFrame,
+  rebaseToParentFrame,
   rebaseZoom,
   denormalizeRect,
 } from '../spatial-graph.js';
@@ -44,6 +46,21 @@ test('parent-relative transforms resolve nested rectangles without global depth 
     width: 400,
     height: 300,
   });
+});
+
+test('explicit child and parent rebasing keeps local camZoom bounded', () => {
+  const child = { id: 'card', localX: 0.2, localY: -0.1, localScale: 0.1, parentId: 'board' };
+  const camera = createCameraFrame({ referenceNodeId: 'board', camX: 0.4, camY: 0.3, camZoom: 4 });
+  const inside = rebaseIntoChildFrame(camera, child);
+  assert.equal(inside.referenceNodeId, 'card');
+  assert.equal(inside.camX, 2);
+  assert.equal(inside.camY, 4);
+  assert.equal(inside.camZoom, 0.5);
+  const outside = rebaseToParentFrame(inside, child, { id: 'board' });
+  assert.equal(outside.referenceNodeId, 'board');
+  assert.ok(Math.abs(outside.camX - 0.4) < 1e-12);
+  assert.ok(Math.abs(outside.camY - 0.3) < 1e-12);
+  assert.equal(outside.camZoom, 5);
 });
 
 test('wormhole traversal halts on a path cycle and reports a guard', () => {

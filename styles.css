@@ -52,6 +52,7 @@ button { border: 0; cursor: pointer; }
 .scale-hud { display: flex; align-items: baseline; gap: 7px; padding-right: 13px; border-right: 1px solid var(--line); }
 .hud-label, .panel-kicker, .hint-key { color: #6b7690; font-size: 9px; letter-spacing: .17em; font-weight: 650; }
 .scale-hud strong { min-width: 37px; color: var(--cyan); font-size: 12px; font-weight: 650; }
+.depth-readout { max-width: 220px; color: #6e7c98; font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 8px; letter-spacing: .02em; white-space: nowrap; }
 .zoom-controls { display: flex; gap: 3px; }
 .icon-button { width: 29px; height: 29px; display: inline-grid; place-items: center; color: #9daac3; border: 1px solid transparent; border-radius: 7px; background: rgba(255,255,255,.025); transition: .18s ease; }
 .icon-button:hover { color: var(--text); border-color: var(--line-bright); background: rgba(255,255,255,.075); }
@@ -175,4 +176,5 @@ kbd { display: inline-block; min-width: 20px; padding: 2px 5px; color: #8c97ae; 
   .canvas-footer { left: 17px; right: 16px; }
   .hint-group { gap: 4px; }
   .hint-group > span:not(.hint-key) { display: none; }
+  .depth-readout { display: none; }
 }
